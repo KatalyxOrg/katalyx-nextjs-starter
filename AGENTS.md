@@ -18,6 +18,7 @@
 | UI copy | **All user-visible strings in French.** Use `t()` from `@/lib/strings` for literals (easier grep / future i18n). Code identifiers in **English.** (Applies to title/description and schema.org text surfaced in SERPs.) |
 | SEO | Use `t()` for user-facing title/description/schema text. See **SEO** below. |
 | Hygiene | Prefer `rm` in terminal over fragile delete tools if a file must be removed. |
+| AI agents | Provider-agnostic layer in `src/server/ai/` (AI SDK 6). Chat UI kit in `src/components/features/chat/`. Streaming via `src/app/api/chat/route.ts`. Conversations persisted in Prisma (`Conversation`, `Message`). |
 
 **Commands:** `npm run dev` | `npm run build` | `npm run lint` | `npm run typecheck`
 
@@ -32,6 +33,7 @@
 - `src/server/services/` — business logic (no React).
 - `src/server/db/` — persistence queries only (e.g. Prisma), when you add a database.
 - `src/server/validators/` — Zod schemas.
+- `src/server/ai/` — provider registry, agent registry, MCP client lifecycle, `runAgent` orchestration (server-only).
 - `src/server/seo/` — metadata helpers (`getRootMetadata`, `pageMetadata`); depends on `env`.
 - `src/components/ui|layout|features/` — UI; optional domain folders under `features/<area>/`; `components/seo/` for JSON-LD shell.
 - `src/lib/seo/` — structured data (JSON-LD) builders; pure data — URLs/names passed in from server pages.
@@ -112,11 +114,21 @@ Maintain `.env.example` with keys, no secrets. `NEXT_PUBLIC_*` is exposed to the
 - **Persistence:** all DB calls go through `src/server/db/` (Prisma client + adapter-pg). The generated client lives in `src/generated/prisma/` (gitignored, regenerated via `npm run db:generate`).
 - **Auth instance:** `src/server/auth/auth.ts` — Better Auth with `emailAndPassword`, `admin`, `organization`, `nextCookies()` plugins. Schema is generated via `npm run auth:generate` (writes to `prisma/schema.prisma`).
 - **Access control:** **only** through `src/server/auth/guards.ts` (`requireSession`, `requireRole("admin")`, `requireOrgRole(orgId, role)`). Never check roles in `"use client"` components — pages and server actions call these guards.
-- **Edge pre-filter:** `src/proxy.ts` (Next 16 proxy / former middleware) does a cookie presence check for `/dashboard` and `/admin` before render. Real authorization still happens server-side.
+- **Edge pre-filter:** `src/proxy.ts` (Next 16 proxy / former middleware) does a cookie presence check for `/dashboard`, `/admin`, and `/assistant` before render. Real authorization still happens server-side.
 - **Client SDK:** `src/lib/auth-client.ts` exports `signIn`, `signUp`, `signOut`, `useSession`, `admin`, `organization` (Better Auth React client with `adminClient` + `organizationClient` plugins).
 - **Schema migrations:** edit `prisma/schema.prisma` (auth models are owned by `auth:generate` — re-run it instead of hand-editing those blocks), then `npm run db:migrate`.
 - **Roles:** application roles are `admin` | `user` (default `user`). Organization roles are `owner` | `admin` | `member`.
 
+## AI agents (reference implementation)
+
+- **Providers:** register models in `src/server/ai/providers.ts`. Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (optional — app boots without them; `/assistant` shows an empty state).
+- **Agents:** extend `src/server/ai/agents/registry.ts` — each agent has `systemPrompt`, `modelId`, built-in `tools`, and `mcpServerIds`.
+- **MCP servers:** register in `src/server/ai/mcp/registry.ts` (code config, versioned). HTTP or stdio transports via `@ai-sdk/mcp`.
+- **Built-in tools:** add server-side tools in `src/server/ai/tools/` and wire them in the agent registry.
+- **Chat API:** `POST /api/chat` — `requireSession` (401 JSON), Zod body (`src/server/validators/chat.ts`), streams via `runAgent` → `toUIMessageStreamResponse`, persists messages on finish.
+- **UI kit:** `src/components/features/chat/` — `ChatPanel`, `ChatMessages`, `ToolInvocation`, `ConversationSidebar`. Demo route: `/assistant`.
+- **Persistence:** `src/server/db/conversations.ts` — user-scoped conversations. For org-scoped agents later, gate with `requireOrgRole` in actions/route.
+
 ## What this starter is **not**
 
-This template stays minimal: **no email verification, no OAuth, no domain features.** Add providers, magic link, 2FA, or product code per app, following the layering above.
+This template stays minimal: **no email verification, no OAuth, no domain features.** Add providers, magic link, 2FA, or product code per app, following the layering above. Runtime MCP admin UI and tool-approval UX are out of scope — extend from the AI SDK 6 primitives when needed.

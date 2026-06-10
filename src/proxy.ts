@@ -1,7 +1,7 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/admin"];
+const PROTECTED_PREFIXES = ["/dashboard", "/admin", "/assistant"];
 
 /**
  * Edge-friendly cookie presence check. Real auth + RBAC happens in
@@ -27,5 +27,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/assistant/:path*"],
 };

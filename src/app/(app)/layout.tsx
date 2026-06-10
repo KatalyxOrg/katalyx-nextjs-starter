@@ -22,6 +22,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <Link href="/dashboard" className="hover:text-foreground">
                 {t("Tableau de bord")}
               </Link>
+              <Link href="/assistant" className="hover:text-foreground">
+                {t("Assistant")}
+              </Link>
               {role === "admin" && (
                 <Link href="/admin" className="hover:text-foreground">
                   {t("Administration")}
